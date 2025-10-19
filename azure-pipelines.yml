@@ -1,5 +1,5 @@
 # ============================================================
-# PIPELINE CI - Proyecto Flask (Sistema de Películas)
+# PIPELINE CI/CD - Proyecto Flask (ProjectoAPIREST)
 # ============================================================
 
 trigger:
@@ -9,18 +9,19 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
+  projectFolder: 'ProjectoAPIREST'    # 👈 nombre exacto de tu carpeta
   artifactName: 'build_artifact'
 
 steps:
 # ============================================================
-# 1️⃣ Verificar directorio actual y contenido
+# 1️⃣ Verificar estructura de archivos
 # ============================================================
 - script: |
     echo "📁 Directorio actual:"
     pwd
-    echo "📂 Archivos y carpetas disponibles:"
+    echo "📂 Contenido del repositorio:"
     ls -la
-  displayName: 'Verificar contenido del directorio'
+  displayName: 'Verificar contenido raíz del repo'
 
 # ============================================================
 # 2️⃣ Usar Python 3.10
@@ -39,46 +40,37 @@ steps:
   displayName: 'Instalar dependencias del sistema'
 
 # ============================================================
-# 4️⃣ Instalar dependencias Python (Flask)
+# 4️⃣ Instalar dependencias Python del proyecto Flask
 # ============================================================
 - script: |
-    echo "📦 Instalando dependencias del proyecto Flask..."
+    echo "📦 Entrando en carpeta del proyecto: $(projectFolder)"
+    cd $(projectFolder)
+    echo "📂 Archivos dentro de la carpeta:"
+    ls -la
     python -m pip install --upgrade pip setuptools wheel
-    # ==========================================
-    # 🔧 IMPORTANTE: CAMBIA ESTA RUTA SI TU ARCHIVO ESTÁ EN UNA CARPETA
-    # Si tu requirements.txt está en la raíz -> deja como está
-    # Si está dentro de 'peliculas/' cámbialo a: pip install -r peliculas/requirements.txt
-    # ==========================================
-    if [ -f requirements.txt ]; then
-        pip install -r requirements.txt
-    elif [ -f peliculas/requirements.txt ]; then
-        pip install -r peliculas/requirements.txt
-    elif [ -f backend/requirements.txt ]; then
-        pip install -r backend/requirements.txt
-    else
-        echo "⚠ No se encontró requirements.txt en las rutas conocidas."
-        exit 1
-    fi
+    pip install -r requirements.txt
   displayName: 'Instalar dependencias Python'
 
 # ============================================================
-# 5️⃣ Levantar la app Flask en background usando SQLite
+# 5️⃣ Levantar la app Flask (modo prueba con SQLite)
 # ============================================================
 - script: |
-    echo "🚀 Iniciando API Flask con base de datos SQLite..."
+    cd $(projectFolder)
+    echo "🚀 Iniciando API Flask..."
     export DATABASE_URL="sqlite:///test.db"
-    python -u app.py > app_stdout.log 2> app_stderr.log &
-    echo $! > app.pid
+    python -u app.py > ../app_stdout.log 2> ../app_stderr.log &
+    echo $! > ../app.pid
     sleep 5
-    echo "✅ Flask debería estar corriendo ahora."
-  displayName: 'Levantar Flask (modo prueba)'
+    echo "✅ Flask levantado."
+  displayName: 'Levantar Flask'
 
 # ============================================================
 # 6️⃣ Ejecutar pruebas automáticas
 # ============================================================
 - script: |
-    echo "🧪 Ejecutando pruebas de API (Test_api.py)..."
-    python Test_api.py || echo "⚠ Algunos tests fallaron."
+    cd $(projectFolder)
+    echo "🧪 Ejecutando pruebas automáticas..."
+    python Test_api.py
   displayName: 'Ejecutar Test_api.py'
 
 # ============================================================
@@ -95,18 +87,18 @@ steps:
   displayName: 'Detener aplicación Flask'
 
 # ============================================================
-# 8️⃣ Empaquetar proyecto en ZIP
+# 8️⃣ Empaquetar aplicación en ZIP
 # ============================================================
 - task: ArchiveFiles@2
   inputs:
-    rootFolderOrFile: '.'
+    rootFolderOrFile: '$(Build.SourcesDirectory)/$(projectFolder)'
     archiveType: 'zip'
     archiveFile: '$(Build.ArtifactStagingDirectory)/$(artifactName).zip'
     replaceExistingArchive: true
   displayName: 'Empaquetar proyecto en ZIP'
 
 # ============================================================
-# 9️⃣ Publicar artifact (ZIP)
+# 9️⃣ Publicar artifact
 # ============================================================
 - task: PublishBuildArtifacts@1
   inputs:
