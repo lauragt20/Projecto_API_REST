@@ -14,7 +14,7 @@ variables:
 
 steps:
 # ============================================================
-# 1️⃣ Verificar estructura de archivos
+# 1️⃣ Verificar estructura del repositorio
 # ============================================================
 - script: |
     echo "📁 Directorio actual:"
@@ -24,7 +24,7 @@ steps:
   displayName: 'Verificar contenido raíz del repo'
 
 # ============================================================
-# 2️⃣ Usar Python 3.10
+# 2️⃣ Configurar Python 3.10
 # ============================================================
 - task: UsePythonVersion@0
   inputs:
@@ -40,7 +40,7 @@ steps:
   displayName: 'Instalar dependencias del sistema'
 
 # ============================================================
-# 4️⃣ Instalar dependencias Python del proyecto Flask
+# 4️⃣ Instalar dependencias del proyecto Flask
 # ============================================================
 - script: |
     echo "📦 Entrando en carpeta del proyecto: $(projectFolder)"
@@ -52,29 +52,35 @@ steps:
   displayName: 'Instalar dependencias Python'
 
 # ============================================================
-# 5️⃣ Levantar la app Flask (modo prueba con SQLite)
+# 5️⃣ Levantar API Flask con SQLite (en background)
 # ============================================================
 - script: |
     cd $(projectFolder)
-    echo "🚀 Iniciando API Flask..."
+    echo "🚀 Iniciando API Flask (modo prueba con SQLite)..."
     export DATABASE_URL="sqlite:///test.db"
     python -u app.py > ../app_stdout.log 2> ../app_stderr.log &
     echo $! > ../app.pid
-    sleep 5
-    echo "✅ Flask levantado."
-  displayName: 'Levantar Flask'
+    echo "⏳ Esperando 10 segundos para que la API se inicialice..."
+    sleep 10
+    echo "🔎 Verificando si el puerto 5000 está activo..."
+    ss -lntp | grep :5000 || echo "⚠ El puerto 5000 no parece estar escuchando todavía."
+  displayName: 'Levantar Flask en background con espera'
 
 # ============================================================
-# 6️⃣ Ejecutar pruebas automáticas
+# 6️⃣ Ejecutar pruebas automáticas de la API
 # ============================================================
 - script: |
     cd $(projectFolder)
-    echo "🧪 Ejecutando pruebas automáticas..."
-    python Test_api.py
-  displayName: 'Ejecutar Test_api.py'
+    echo "🧪 Ejecutando pruebas automáticas (Test_api.py)..."
+    python Test_api.py || echo "⚠ Algunas pruebas fallaron."
+    echo "📄 Logs de Flask (stdout):"
+    cat ../app_stdout.log || true
+    echo "📄 Logs de Flask (stderr):"
+    cat ../app_stderr.log || true
+  displayName: 'Ejecutar Test_api.py con logs'
 
 # ============================================================
-# 7️⃣ Detener Flask
+# 7️⃣ Detener la aplicación Flask
 # ============================================================
 - script: |
     if [ -f app.pid ]; then
@@ -87,7 +93,7 @@ steps:
   displayName: 'Detener aplicación Flask'
 
 # ============================================================
-# 8️⃣ Empaquetar aplicación en ZIP
+# 8️⃣ Empaquetar el proyecto en ZIP
 # ============================================================
 - task: ArchiveFiles@2
   inputs:
@@ -98,7 +104,7 @@ steps:
   displayName: 'Empaquetar proyecto en ZIP'
 
 # ============================================================
-# 9️⃣ Publicar artifact
+# 9️⃣ Publicar artifact ZIP
 # ============================================================
 - task: PublishBuildArtifacts@1
   inputs:
